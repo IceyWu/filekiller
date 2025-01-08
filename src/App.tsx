@@ -53,7 +53,7 @@ function App() {
   const updateWindowHeight = async () => {
     // 获取内容元素的实际高度
     const contentHeight =
-    document.getElementById("content")?.scrollHeight || 430;
+      document.getElementById("content")?.scrollHeight || 430;
     const newHeight = Math.min(Math.max(contentHeight, 430), 800);
     await appWindow.setSize(new LogicalSize(446, newHeight));
   };
@@ -217,7 +217,9 @@ function App() {
                 <p className="text-sm text-indigo-600 font-medium mb-1">
                   Selected {selectionType}:
                 </p>
-                <p className="text-gray-700 font-medium break-all">{path}</p>
+                <p className="text-gray-700 font-medium break-all line-clamp-1">
+                  {path}
+                </p>
               </div>
             )}
 
@@ -234,7 +236,7 @@ function App() {
                 ) : (
                   <CheckCircle2 className="w-5 h-5 mt-0.5 flex-shrink-0" />
                 )}
-                <span>{status}</span>
+                <span className="line-clamp-1">{status}</span>
               </div>
             )}
           </div>
