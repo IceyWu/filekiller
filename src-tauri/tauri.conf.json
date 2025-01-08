@@ -17,7 +17,8 @@
         "resizable": false,
         "title": "File Manager",
         "width": 446,
-        "height": 430,
+        "minHeight": 430,
+        "maxHeight": 800,
         "transparent": true,
         "center": true
       }

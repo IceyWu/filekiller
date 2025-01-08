@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { remove, exists } from "@tauri-apps/plugin-fs";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { exists } from "@tauri-apps/plugin-fs";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import {
   Trash2,
   FolderOpen,
@@ -10,14 +10,18 @@ import {
   File,
   Folder,
   Minus,
-  Square,
+  // Square,
   X,
 } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 const appWindow = getCurrentWindow();
 function App() {
   const [path, setPath] = useState("");
   const [status, setStatus] = useState("");
-  const [selectionType, setSelectionType] = useState<"file" | "folder">("file");
+  const [selectionType, setSelectionType] = useState<"file" | "folder">(
+    "folder"
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const selectPath = async () => {
     try {
@@ -43,38 +47,66 @@ function App() {
     } catch (error) {
       setStatus("Error selecting path: " + error);
     }
+    updateWindowHeight();
+  };
+  // 在需要调整高度的地方（比如状态更新后）调用这个函数
+  const updateWindowHeight = async () => {
+    // 获取内容元素的实际高度
+    const contentHeight =
+    document.getElementById("content")?.scrollHeight || 430;
+    const newHeight = Math.min(Math.max(contentHeight, 430), 800);
+    await appWindow.setSize(new LogicalSize(446, newHeight));
   };
 
   const handleDelete = async () => {
     if (!path) {
-      setStatus("Please select a file or folder first");
+      setStatus("请先选择文件或文件夹");
+      updateWindowHeight();
       return;
     }
 
     try {
+      setIsDeleting(true);
+      setStatus("正在删除中...");
+      updateWindowHeight();
+
       const fileExists = await exists(path);
       if (!fileExists) {
-        setStatus("Path does not exist");
+        setStatus("路径不存在");
+        setIsDeleting(false);
+        updateWindowHeight();
         return;
       }
 
       const isDirectory = selectionType === "folder";
 
-      if (isDirectory) {
-        await remove(path, { recursive: true });
-      } else {
-        await remove(path);
-      }
-
-      setStatus("Successfully deleted: " + path);
-      setPath("");
+      await invoke("delete_path", {
+        path,
+        isDirectory,
+      })
+        .then(() => {
+          setStatus("成功删除: " + path);
+          setPath("");
+        })
+        .catch((error) => {
+          setStatus("删除错误: " + error);
+        })
+        .finally(() => {
+          setIsDeleting(false);
+          updateWindowHeight();
+        });
     } catch (error) {
-      setStatus("Error deleting: " + error);
+      setStatus("删除错误: " + error);
+      setIsDeleting(false);
+      updateWindowHeight();
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 rounded-lg overflow-hidden">
+    <div
+      id="content"
+      className="h-auto bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 rounded-lg overflow-hidden"
+    >
       {/* Custom Title Bar */}
       <div
         data-tauri-drag-region
@@ -93,12 +125,12 @@ function App() {
           >
             <Minus size={16} />
           </button>
-          <button
+          {/* <button
             onClick={() => appWindow.toggleMaximize()}
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600"
           >
             <Square size={16} />
-          </button>
+          </button> */}
           <button
             onClick={() => appWindow.close()}
             className="p-1.5 hover:bg-red-100 hover:text-red-600 rounded-md text-gray-600"
@@ -125,17 +157,6 @@ function App() {
           <div className="space-y-6">
             <div className="flex gap-2 p-2 bg-gray-50 rounded-lg">
               <button
-                onClick={() => setSelectionType("file")}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
-                  selectionType === "file"
-                    ? "bg-white shadow text-indigo-600"
-                    : "text-gray-600 hover:bg-white/50"
-                }`}
-              >
-                <File size={20} />
-                File
-              </button>
-              <button
                 onClick={() => setSelectionType("folder")}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
                   selectionType === "folder"
@@ -145,6 +166,17 @@ function App() {
               >
                 <Folder size={20} />
                 Folder
+              </button>
+              <button
+                onClick={() => setSelectionType("file")}
+                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                  selectionType === "file"
+                    ? "bg-white shadow text-indigo-600"
+                    : "text-gray-600 hover:bg-white/50"
+                }`}
+              >
+                <File size={20} />
+                File
               </button>
             </div>
 
@@ -159,15 +191,24 @@ function App() {
 
               <button
                 onClick={handleDelete}
-                disabled={!path}
+                disabled={!path || isDeleting}
                 className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl transition-all duration-200 shadow-md hover:shadow-lg ${
-                  path
+                  path && !isDeleting
                     ? "bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
               >
-                <Trash2 size={20} />
-                Delete
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent" />
+                    deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={20} />
+                    Delete
+                  </>
+                )}
               </button>
             </div>
 
